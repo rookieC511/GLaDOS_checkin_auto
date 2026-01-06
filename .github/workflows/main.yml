@@ -1,0 +1,41 @@
+name: GLaDOS Checkin
+
+on:
+  push:
+    branches: [ main, master ]
+  schedule:
+    - cron: '30 0 * * *'  # 每天北京时间早上 8:30 自动运行
+  workflow_dispatch:      # 允许你手动点击按钮运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+        
+    - name: Run Checkin
+      env:
+        # 左边必须叫 GLADOS_COOKIE (这是脚本强制要求的)
+        # 右边必须叫 secrets.COOKIE (这是你刚才存的名字)
+        GLADOS_COOKIE: ${{ secrets.COOKIE }}
+      run: |
+        # 尝试运行最常见的脚本名，通常是 glados.py
+        if [ -f glados.py ]; then
+          python glados.py
+        elif [ -f checkin.py ]; then
+          python checkin.py
+        else
+          echo "找不到脚本文件，请查看 Code 页面确认文件名"
+          exit 1
+        fi

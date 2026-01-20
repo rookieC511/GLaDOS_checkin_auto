@@ -1,88 +1,99 @@
-import requests, json, os
+import requests
+import json
+import os
 
 # -------------------------------------------------------------------------------------------
-# github workflows: GLaDOS Checkin (2026 Updated Domain)
+# GLaDOS Checkin Script (Target: glados.cloud)
 # -------------------------------------------------------------------------------------------
-if __name__ == '__main__':
-    # pushplus秘钥 申请地址 http://www.pushplus.plus
-    sckey = os.environ.get("PUSHPLUS_TOKEN", "")
-    
-    # 推送内容
-    sendContent = ''
-    
-    # glados账号cookie
-    # 兼容处理：如果 secrets 里没有配置，避免 split 报错
+
+def glados_checkin():
+    # 1. 获取 Cookie
     cookie_str = os.environ.get("GLADOS_COOKIE", "")
     if not cookie_str:
-        print('未获取到 COOKIE 变量，请检查 GitHub Secrets')
-        exit(0)
-        
+        print("❌ 错误: 未找到 GLADOS_COOKIE 环境变量，请在 Settings -> Secrets 中配置。")
+        return
+
     cookies = cookie_str.split("&")
     
-    # ------------------------------------------------------
-    # 🔄 核心修改：域名从 glados.rocks 更新为 glados.cloud
-    # ------------------------------------------------------
-    base_url = "https://glados.cloud"
-    url = f"{base_url}/api/user/checkin"
-    url2 = f"{base_url}/api/user/status"
-    referer = f"{base_url}/console/checkin"
-    origin = base_url
-    
-    useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    
-    # Token 通常跟随域名更新，使用通用的 glados.network
-    payload = {
-        'token': 'glados.network'
-    }
+    # 2. PushPlus 配置
+    sckey = os.environ.get("PUSHPLUS_TOKEN", "")
+    send_content = ""
 
-    for cookie in cookies:
-        if not cookie.strip():
-            continue
-            
+    # 3. 核心配置 (针对 glados.cloud)
+    # 网页地址: https://glados.cloud/console/checkin
+    # 接口地址: https://glados.cloud/api/user/checkin
+    base_url = "https://glados.cloud"
+    checkin_url = f"{base_url}/api/user/checkin"
+    status_url = f"{base_url}/api/user/status"
+    
+    # 伪装成真实的浏览器访问
+    headers = {
+        "cookie": "",  # 后面循环里填
+        "referer": f"{base_url}/console/checkin",
+        "origin": base_url,
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "content-type": "application/json;charset=UTF-8",
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+    
+    payload = {"token": "glados.network"}
+
+    print(f"🚀 正在尝试连接新域名: {base_url}")
+
+    for idx, cookie in enumerate(cookies):
+        if not cookie.strip(): continue
+        
+        # 移除可能误复制的 "cookie:" 前缀
+        clean_cookie = cookie.replace("cookie:", "").replace("Cookie:", "").strip()
+        headers["cookie"] = clean_cookie
+
         try:
-            # 1. 执行签到
-            checkin = requests.post(url, headers={
-                'cookie': cookie,
-                'referer': referer,
-                'origin': origin,
-                'user-agent': useragent,
-                'content-type': 'application/json;charset=UTF-8'
-            }, data=json.dumps(payload))
+            # --- 动作 A: 签到 ---
+            print(f"[{idx+1}] 正在签到...")
+            resp = requests.post(checkin_url, headers=headers, json=payload)
             
-            # 2. 获取状态 (查分)
-            state = requests.get(url2, headers={
-                'cookie': cookie,
-                'referer': referer,
-                'origin': origin,
-                'user-agent': useragent
-            })
+            # 调试：如果不是 200，打印出来看看到底报什么错
+            if resp.status_code != 200:
+                print(f"❌ 签到请求失败: HTTP {resp.status_code}")
+                print(f"❌ 服务器返回: {resp.text}")
+                continue
+                
+            res_json = resp.json()
+            message = res_json.get("message", "")
             
-            # 解析数据
-            if state.status_code == 200 and 'data' in state.json():
-                data = state.json()['data']
-                left_days = data['leftDays'].split('.')[0]
-                points = data.get('points', 0) # ✨ 新增：获取积分
-                email = data['email']
+            # --- 动作 B: 查状态 ---
+            print(f"[{idx+1}] 正在获取状态...")
+            status_resp = requests.get(status_url, headers=headers)
+            
+            if status_resp.status_code == 200 and 'data' in status_resp.json():
+                data = status_resp.json()['data']
+                email = data.get('email', 'Unknown User')
+                points = data.get('points', 0)
+                left_days = data.get('leftDays', '?').split('.')[0]
                 
-                # 获取签到返回的消息
-                mess = checkin.json().get('message', 'Checkin OK')
-                
-                # --- 日志格式优化 ---
-                log_msg = f"{email} | 结果: {mess} | 剩余: {left_days}天 | 💰积分: {points}"
+                log_msg = f"✅ 用户: {email} | 结果: {message} | 📅 剩余: {left_days}天 | 💰 积分: {points}"
                 print(log_msg)
+                send_content += log_msg + "\n"
                 
-                sendContent += log_msg + '\n'
-                
-                # 简单的积分兑换提醒
                 if int(points) >= 200:
-                    sendContent += "⚠️ 提示：积分已达标，请去官网兑换 30 天！\n"
+                    send_content += "👉 提示: 积分已超 200，可去官网兑换 30 天！\n"
             else:
-                print('cookie已失效或网络错误')
-                requests.get('http://www.pushplus.plus/send?token=' + sckey + '&content=GLaDOS_Cookie已失效')
-                
+                print(f"⚠️ 状态获取失败: {status_resp.text}")
+                send_content += f"用户{idx+1}: 签到成功但无法获取详情 (Cookie可能部分失效)\n"
+
         except Exception as e:
-            print(f"账号处理出错: {e}")
+            print(f"❌ 运行异常: {e}")
+            send_content += f"用户{idx+1}: 脚本运行出错\n"
 
     # 推送消息
-    if sckey != "" and sendContent != "":
-        requests.get('http://www.pushplus.plus/send?token=' + sckey + '&title=GLaDOS签到通知&content=' + sendContent)
+    if sckey and send_content:
+        requests.post("http://www.pushplus.plus/send", json={
+            "token": sckey,
+            "title": "GLaDOS签到汇报",
+            "content": send_content,
+            "template": "txt"
+        })
+
+if __name__ == '__main__':
+    glados_checkin()

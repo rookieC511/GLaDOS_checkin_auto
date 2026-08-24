@@ -1,15 +1,33 @@
-name: Keepalive Workflow
+name: Keep scheduled workflows active
+
 on:
   schedule:
-    - cron: "0 0 * * *"
+    # Two small repository updates per month prevent GitHub's 60-day inactivity disable.
+    - cron: "17 3 1,15 * *"
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   keepalive:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    timeout-minutes: 5
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          commit_message: "chore: auto keepalive"
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Record repository activity
+        shell: bash
+        run: |
+          printf 'Last maintenance: %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > MAINTENANCE.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add MAINTENANCE.md
+          if git diff --cached --quiet; then
+            echo "No maintenance update required."
+            exit 0
+          fi
+          git commit -m "chore: keep scheduled workflows active"
+          git push

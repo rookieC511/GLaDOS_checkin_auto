@@ -117,6 +117,8 @@ def is_successful_checkin(payload: dict[str, Any]) -> bool:
     message = str(payload.get("message") or "").strip().lower()
     if payload.get("code") == 0:
         return True
+    if payload.get("code") == 1 and message == "today's observation logged. return tomorrow for more points.":
+        return True
     if "please checkin via" in message:
         return False
     positive_markers = ("got", "repeat", "already", "checked in", "success", "签到成功", "已签到")

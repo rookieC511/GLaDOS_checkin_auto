@@ -101,6 +101,13 @@ class GladosTests(unittest.TestCase):
             glados.check_in(session, "https://glados.cloud", "secret-cookie")
         self.assertEqual(len(session.calls), 1)
 
+    def test_new_already_logged_response_is_success_without_retry(self):
+        message = "Today's observation logged. Return tomorrow for more points."
+        session = FakeSession([FakeResponse({"code": 1, "message": message})])
+        self.assertEqual(glados.check_in(session, "https://glados.cloud", "secret-cookie"), message)
+        self.assertEqual(len(session.calls), 1)
+        self.assertFalse(glados.is_successful_checkin({"code": 4, "message": message}))
+
     @patch("glados.time.sleep", return_value=None)
     def test_transient_network_error_is_retried(self, _sleep):
         session = FakeSession(

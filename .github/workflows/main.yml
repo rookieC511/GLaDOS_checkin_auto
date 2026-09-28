@@ -37,5 +37,8 @@ jobs:
         env:
           GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIE || secrets.COOKIE }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
-          GLADOS_BASE_URL: https://glados.network
+          GLADOS_BASE_URL: https://glados.cloud
+          # Match the Mac Chrome session used to obtain GLADOS_COOKIE.
+          # Override this repository variable after logging in on a different device.
+          GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36' }}
         run: python glados.py

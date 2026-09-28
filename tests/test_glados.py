@@ -70,6 +70,44 @@ class GladosTests(unittest.TestCase):
         with self.assertRaisesRegex(glados.CheckinError, "Cookie"):
             glados.get_status(session, "https://glados.network", "expired-cookie")
 
+    def test_checkin_uses_selected_origin_token_first(self):
+        for host in ("glados.cloud", "glados.network", "glados.rocks"):
+            with self.subTest(host=host):
+                session = FakeSession([FakeResponse({"code": 0, "message": "Checkin Repeats!"})])
+                glados.check_in(session, f"https://{host}", "secret-cookie")
+                self.assertEqual(session.calls[0][2]["json"], {"token": host})
+
+    def test_user_agent_matches_configured_login_browser(self):
+        with patch.dict("os.environ", {"GLADOS_USER_AGENT": " Mac Chrome test "}):
+            headers = glados.request_headers("https://glados.cloud", "secret-cookie")
+        self.assertEqual(headers["user-agent"], "Mac Chrome test")
+
+    def test_device_mismatch_has_actionable_error_without_sensitive_values(self):
+        session = FakeSession([FakeResponse({
+            "code": 4, "reason": "device-mismatch",
+            "message": "Automated check-in detected. Please sign in again to continue.",
+            "loginDevice": "secret-cookie",
+        })])
+        with self.assertRaisesRegex(glados.CheckinError, "GLADOS_USER_AGENT") as caught:
+            glados.check_in(session, "https://glados.cloud", "secret-cookie")
+        self.assertNotIn("secret-cookie", str(caught.exception))
+        self.assertEqual(len(session.calls), 1)
+
+    def test_automation_block_stops_token_attempts(self):
+        session = FakeSession([FakeResponse({
+            "message": "Automated check-in detected. Please sign in again to continue."
+        })])
+        with self.assertRaisesRegex(glados.CheckinError, "拒绝自动签到"):
+            glados.check_in(session, "https://glados.cloud", "secret-cookie")
+        self.assertEqual(len(session.calls), 1)
+
+    def test_new_already_logged_response_is_success_without_retry(self):
+        message = "Today's observation logged. Return tomorrow for more points."
+        session = FakeSession([FakeResponse({"code": 1, "message": message})])
+        self.assertEqual(glados.check_in(session, "https://glados.cloud", "secret-cookie"), message)
+        self.assertEqual(len(session.calls), 1)
+        self.assertFalse(glados.is_successful_checkin({"code": 4, "message": message}))
+
     @patch("glados.time.sleep", return_value=None)
     def test_transient_network_error_is_retried(self, _sleep):
         session = FakeSession(

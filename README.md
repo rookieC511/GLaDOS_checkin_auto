@@ -9,6 +9,8 @@
 - `GLADOS_COOKIE`：必需，GLaDOS 登录 Cookie。为了兼容旧配置，也会读取名为 `COOKIE` 的 Secret。
 - `PUSHPLUS_TOKEN`：可选，用于推送签到结果。
 
+在同一配置页的 **Variables** 中可设置 `GLADOS_USER_AGENT`，值应与获取 Cookie 时浏览器请求头的 `User-Agent` 一致（这是普通配置，不是 Cookie）。当前工作流默认匹配 Mac Chrome 登录会话；换用 Windows、手机等设备重新登录后，应同时更新这个变量。直接运行 Python 时也可使用同名环境变量。
+
 多个账号仍可用 `&` 分隔，也可以每行放一个 Cookie。
 
 > Cookie 是登录凭据。只应放进 GitHub Actions Secret，不要写入代码、Issue 或公开日志。
@@ -32,7 +34,7 @@
 
 脚本会依次尝试 `glados.cloud`、`glados.network` 和 `glados.rocks`，并对临时网络故障进行有限重试。签到 token 优先与实际请求域名一致。日志只显示“账号 1/2…”，不会输出 Cookie 或邮箱。
 
-若接口返回 `Automated check-in detected. Please sign in again to continue.`，表示服务端拒绝自动签到。脚本会立即停止该账号的 token 尝试并报告失败；更新 Cookie 不一定能解决此限制，需要在官网重新登录并签到。网页签到成功不代表 GitHub Actions 自动签到已经恢复。
+若接口返回 `Automated check-in detected. Please sign in again to continue.`，脚本会停止该账号的 token 尝试并报告失败。这不一定是全面禁止自动签到：当 `reason=device-mismatch` 时，是请求 User-Agent 与登录设备不一致，应核对 `GLADOS_USER_AGENT`。其他原因仍需要在官网核实，不能仅凭网页签到成功就认为 GitHub Actions 已恢复。复制 Cookie 时应使用完整请求头，包含网页实际发送的 `gld:sess` 等会话字段，而不是只摘取旧版 `koa:sess` 字段。
 
 ## 本地测试
 

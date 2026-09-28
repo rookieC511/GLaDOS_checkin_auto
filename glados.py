@@ -60,7 +60,7 @@ def request_headers(base_url: str, cookie: str) -> dict[str, str]:
         "cookie": cookie,
         "origin": base_url,
         "referer": f"{base_url}/console/checkin",
-        "user-agent": (
+        "user-agent": os.environ.get("GLADOS_USER_AGENT", "").strip() or (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/144.0.0.0 Safari/537.36"
@@ -141,6 +141,11 @@ def check_in(session: requests.Session, base_url: str, cookie: str) -> str:
         )
         message = str(payload.get("message") or "unknown response").strip()
         if "automated check-in detected" in message.lower():
+            if payload.get("reason") == "device-mismatch":
+                raise CheckinError(
+                    "登录设备与请求 User-Agent 不一致。请将 GLADOS_USER_AGENT "
+                    "设为获取 Cookie 时浏览器的 User-Agent；已停止其他 token 尝试。"
+                )
             raise CheckinError(
                 "GLaDOS 拒绝自动签到，要求重新登录。请在官网完成签到；"
                 "已停止尝试其他 token，不会将拦截误报为成功。"

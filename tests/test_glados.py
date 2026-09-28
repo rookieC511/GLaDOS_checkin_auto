@@ -77,6 +77,22 @@ class GladosTests(unittest.TestCase):
                 glados.check_in(session, f"https://{host}", "secret-cookie")
                 self.assertEqual(session.calls[0][2]["json"], {"token": host})
 
+    def test_user_agent_matches_configured_login_browser(self):
+        with patch.dict("os.environ", {"GLADOS_USER_AGENT": " Mac Chrome test "}):
+            headers = glados.request_headers("https://glados.cloud", "secret-cookie")
+        self.assertEqual(headers["user-agent"], "Mac Chrome test")
+
+    def test_device_mismatch_has_actionable_error_without_sensitive_values(self):
+        session = FakeSession([FakeResponse({
+            "code": 4, "reason": "device-mismatch",
+            "message": "Automated check-in detected. Please sign in again to continue.",
+            "loginDevice": "secret-cookie",
+        })])
+        with self.assertRaisesRegex(glados.CheckinError, "GLADOS_USER_AGENT") as caught:
+            glados.check_in(session, "https://glados.cloud", "secret-cookie")
+        self.assertNotIn("secret-cookie", str(caught.exception))
+        self.assertEqual(len(session.calls), 1)
+
     def test_automation_block_stops_token_attempts(self):
         session = FakeSession([FakeResponse({
             "message": "Automated check-in detected. Please sign in again to continue."

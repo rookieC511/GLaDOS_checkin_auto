@@ -37,5 +37,5 @@ jobs:
         env:
           GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIE || secrets.COOKIE }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
-          GLADOS_BASE_URL: https://glados.network
+          GLADOS_BASE_URL: https://glados.cloud
         run: python glados.py

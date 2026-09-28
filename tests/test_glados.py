@@ -70,6 +70,21 @@ class GladosTests(unittest.TestCase):
         with self.assertRaisesRegex(glados.CheckinError, "Cookie"):
             glados.get_status(session, "https://glados.network", "expired-cookie")
 
+    def test_checkin_uses_selected_origin_token_first(self):
+        for host in ("glados.cloud", "glados.network", "glados.rocks"):
+            with self.subTest(host=host):
+                session = FakeSession([FakeResponse({"code": 0, "message": "Checkin Repeats!"})])
+                glados.check_in(session, f"https://{host}", "secret-cookie")
+                self.assertEqual(session.calls[0][2]["json"], {"token": host})
+
+    def test_automation_block_stops_token_attempts(self):
+        session = FakeSession([FakeResponse({
+            "message": "Automated check-in detected. Please sign in again to continue."
+        })])
+        with self.assertRaisesRegex(glados.CheckinError, "拒绝自动签到"):
+            glados.check_in(session, "https://glados.cloud", "secret-cookie")
+        self.assertEqual(len(session.calls), 1)
+
     @patch("glados.time.sleep", return_value=None)
     def test_transient_network_error_is_retried(self, _sleep):
         session = FakeSession(

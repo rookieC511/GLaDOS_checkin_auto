@@ -13,8 +13,8 @@ import requests
 
 
 DEFAULT_BASE_URLS = (
-    "https://glados.network",
     "https://glados.cloud",
+    "https://glados.network",
     "https://glados.rocks",
 )
 CHECKIN_TOKENS = ("glados.network", "glados.cloud", "glados.one")
@@ -129,7 +129,9 @@ def is_successful_checkin(payload: dict[str, Any]) -> bool:
 
 def check_in(session: requests.Session, base_url: str, cookie: str) -> str:
     errors: list[str] = []
-    for token in CHECKIN_TOKENS:
+    # Match the official web client's token to the selected origin first.
+    tokens = dict.fromkeys((urlparse(base_url).hostname, *CHECKIN_TOKENS))
+    for token in tokens:
         payload = request_json(
             session,
             "POST",
@@ -138,6 +140,11 @@ def check_in(session: requests.Session, base_url: str, cookie: str) -> str:
             json={"token": token},
         )
         message = str(payload.get("message") or "unknown response").strip()
+        if "automated check-in detected" in message.lower():
+            raise CheckinError(
+                "GLaDOS 拒绝自动签到，要求重新登录。请在官网完成签到；"
+                "已停止尝试其他 token，不会将拦截误报为成功。"
+            )
         if payload.get("code") == -2 or "没有权限" in message:
             raise CheckinError("Cookie 已过期或无权限")
         if is_successful_checkin(payload):

@@ -30,7 +30,9 @@
 - GLaDOS 接口连续请求失败；
 - 所有当前签到 token 均被拒绝。
 
-脚本会依次尝试 `glados.network`、`glados.cloud` 和 `glados.rocks`，并对临时网络故障进行有限重试。日志只显示“账号 1/2…”，不会输出 Cookie 或邮箱。
+脚本会依次尝试 `glados.cloud`、`glados.network` 和 `glados.rocks`，并对临时网络故障进行有限重试。签到 token 优先与实际请求域名一致。日志只显示“账号 1/2…”，不会输出 Cookie 或邮箱。
+
+若接口返回 `Automated check-in detected. Please sign in again to continue.`，表示服务端拒绝自动签到。脚本会立即停止该账号的 token 尝试并报告失败；更新 Cookie 不一定能解决此限制，需要在官网重新登录并签到。网页签到成功不代表 GitHub Actions 自动签到已经恢复。
 
 ## 本地测试
 
